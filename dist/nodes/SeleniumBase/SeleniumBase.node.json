@@ -1,0 +1,22 @@
+{
+    "$schema": "https://json.schemastore.org/n8n-nodes-v1.json",
+    "node": "seleniumBase",
+    "nodeVersion": "1.0",
+    "codexVersion": "1.0",
+    "categories": [
+        "Development",
+        "Data & Storage"
+    ],
+    "resources": {
+        "credentialDocumentation": [
+            {
+                "url": "https://github.com/seleniumbase/SeleniumBase"
+            }
+        ],
+        "primaryDocumentation": [
+            {
+                "url": "https://seleniumbase.io/"
+            }
+        ]
+    }
+}

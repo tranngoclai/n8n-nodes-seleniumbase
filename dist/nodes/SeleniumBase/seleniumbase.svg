@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="60" height="60">
+  <!-- Background circle -->
+  <circle cx="50" cy="50" r="45" fill="#0c6e2e" opacity="0.9"/>
+  
+  <!-- Stylized "SB" text -->
+  <text x="50" y="60" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="white" text-anchor="middle">SB</text>
+  
+  <!-- Browser/automation indicator - small gear at bottom right -->
+  <circle cx="72" cy="72" r="12" fill="#ffffff" opacity="0.9"/>
+  <path d="M72 64 L74 68 L78 68 L75 71 L76 75 L72 73 L68 75 L69 71 L66 68 L70 68 Z" fill="#0c6e2e"/>
+</svg>
