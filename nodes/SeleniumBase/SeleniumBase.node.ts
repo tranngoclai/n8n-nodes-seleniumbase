@@ -8,6 +8,18 @@ import type {
 } from 'n8n-workflow';
 import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
+// Constants
+const DEFAULT_POLLING_INTERVAL = 5;
+const DEFAULT_TIMEOUT = 600;
+const MILLISECONDS_PER_SECOND = 1000;
+const JOB_STATUS = {
+    PENDING: 'pending',
+    RUNNING: 'running',
+    COMPLETED: 'completed',
+    FAILED: 'failed',
+} as const;
+
+// Interfaces
 interface ArtifactInfo {
     filename: string;
     path: string;
@@ -41,23 +53,41 @@ interface StatusResponse {
     completed_at?: string;
 }
 
-// Helper function to pause execution
+/**
+ * Pauses execution for the specified duration
+ * @param ms - Duration to sleep in milliseconds
+ */
 async function sleep(ms: number): Promise<void> {
     await new Promise<void>((resolve) => {
-        const id = setTimeout(() => {
-            clearTimeout(id);
-            resolve();
-        }, ms);
+        setTimeout(resolve, ms);
     });
 }
 
-// Helper function to submit a job
+/**
+ * Validates that a string parameter is not empty
+ * @param value - The value to validate
+ * @param paramName - The name of the parameter for error messages
+ * @throws NodeOperationError if the value is empty
+ */
+function validateRequiredString(value: string, paramName: string, node: ReturnType<IExecuteFunctions['getNode']>): void {
+    if (!value || value.trim() === '') {
+        throw new NodeOperationError(node, `${paramName} cannot be empty`);
+    }
+}
+
+/**
+ * Submits a Python script as a job to the SeleniumBase API
+ * @param context - The n8n execution context
+ * @param baseUrl - The base URL of the SeleniumBase API
+ * @param pythonCode - The Python code to execute
+ * @returns The submit response containing job_id and status
+ */
 async function submitJob(
     context: IExecuteFunctions,
     baseUrl: string,
     pythonCode: string,
 ): Promise<SubmitResponse> {
-    const boundary = '----n8nFormBoundary' + Math.random().toString(36).substring(2);
+    const boundary = `----n8nFormBoundary${Math.random().toString(36).substring(2)}`;
     const filename = 'script.py';
 
     const body = [
@@ -70,67 +100,197 @@ async function submitJob(
         '',
     ].join('\r\n');
 
-    const response = await context.helpers.httpRequest({
-        method: 'POST',
-        url: `${baseUrl}/submit`,
-        headers: {
-            'Content-Type': `multipart/form-data; boundary=${boundary}`,
-        },
-        body,
-    });
+    try {
+        const response = await context.helpers.httpRequest({
+            method: 'POST',
+            url: `${baseUrl}/submit`,
+            headers: {
+                'Content-Type': `multipart/form-data; boundary=${boundary}`,
+            },
+            body,
+        });
 
-    return response as SubmitResponse;
+        return response as SubmitResponse;
+    } catch (error) {
+        throw new NodeOperationError(
+            context.getNode(),
+            `Failed to submit job: ${(error as Error).message}`,
+        );
+    }
 }
 
-// Helper function to get job status
+/**
+ * Retrieves the current status of a job
+ * @param context - The n8n execution context
+ * @param baseUrl - The base URL of the SeleniumBase API
+ * @param jobId - The ID of the job to check
+ * @returns The status response
+ */
 async function getJobStatus(
     context: IExecuteFunctions,
     baseUrl: string,
     jobId: string,
 ): Promise<StatusResponse> {
-    const response = await context.helpers.httpRequest({
-        method: 'GET',
-        url: `${baseUrl}/status/${jobId}`,
-    });
+    try {
+        const response = await context.helpers.httpRequest({
+            method: 'GET',
+            url: `${baseUrl}/status/${jobId}`,
+        });
 
-    return response as StatusResponse;
+        return response as StatusResponse;
+    } catch (error) {
+        throw new NodeOperationError(
+            context.getNode(),
+            `Failed to get job status for job ${jobId}: ${(error as Error).message}`,
+        );
+    }
 }
 
-// Helper function to get job result
+/**
+ * Retrieves the complete result of a job
+ * @param context - The n8n execution context
+ * @param baseUrl - The base URL of the SeleniumBase API
+ * @param jobId - The ID of the job
+ * @returns The job result including artifacts and logs
+ */
 async function getJobResult(
     context: IExecuteFunctions,
     baseUrl: string,
     jobId: string,
 ): Promise<JobResult> {
-    const response = await context.helpers.httpRequest({
-        method: 'GET',
-        url: `${baseUrl}/result/${jobId}`,
-    });
+    try {
+        const response = await context.helpers.httpRequest({
+            method: 'GET',
+            url: `${baseUrl}/result/${jobId}`,
+        });
 
-    return response as JobResult;
+        return response as JobResult;
+    } catch (error) {
+        throw new NodeOperationError(
+            context.getNode(),
+            `Failed to get job result for job ${jobId}: ${(error as Error).message}`,
+        );
+    }
 }
 
-// Helper function to download an artifact as binary
+/**
+ * Downloads a job artifact as binary data
+ * @param context - The n8n execution context
+ * @param baseUrl - The base URL of the SeleniumBase API
+ * @param jobId - The ID of the job
+ * @param artifact - The artifact information
+ * @returns Binary data for the artifact
+ */
 async function downloadArtifact(
     context: IExecuteFunctions,
     baseUrl: string,
     jobId: string,
     artifact: ArtifactInfo,
 ): Promise<IBinaryData> {
-    const response = await context.helpers.httpRequest({
-        method: 'GET',
-        url: `${baseUrl}/artifacts/${jobId}/${artifact.filename}`,
-        encoding: 'arraybuffer',
-        returnFullResponse: true,
-    });
+    try {
+        const response = await context.helpers.httpRequest({
+            method: 'GET',
+            url: `${baseUrl}/artifacts/${jobId}/${artifact.filename}`,
+            encoding: 'arraybuffer',
+            returnFullResponse: true,
+        });
 
-    const buffer = Buffer.from(response.body as ArrayBuffer);
+        const buffer = Buffer.from(response.body as ArrayBuffer);
 
-    return await context.helpers.prepareBinaryData(
-        buffer,
-        artifact.filename,
-        artifact.type,
-    );
+        return await context.helpers.prepareBinaryData(
+            buffer,
+            artifact.filename,
+            artifact.type,
+        );
+    } catch (error) {
+        throw new NodeOperationError(
+            context.getNode(),
+            `Failed to download artifact ${artifact.filename}: ${(error as Error).message}`,
+        );
+    }
+}
+
+/**
+ * Downloads all artifacts from a job result as binary data
+ * @param context - The n8n execution context
+ * @param baseUrl - The base URL of the SeleniumBase API
+ * @param jobId - The ID of the job
+ * @param result - The job result containing artifacts
+ * @returns Object mapping filenames to binary data
+ */
+async function downloadAllArtifacts(
+    context: IExecuteFunctions,
+    baseUrl: string,
+    jobId: string,
+    result: JobResult,
+): Promise<{ [key: string]: IBinaryData }> {
+    const binaryData: { [key: string]: IBinaryData } = {};
+
+    if (!result.artifacts || result.artifacts.length === 0) {
+        return binaryData;
+    }
+
+    for (const artifact of result.artifacts) {
+        // Use filename as binary key
+        binaryData[artifact.filename] = await downloadArtifact(
+            context,
+            baseUrl,
+            jobId,
+            artifact,
+        );
+    }
+
+    return binaryData;
+}
+
+/**
+ * Waits for a job to complete by polling its status
+ * @param context - The n8n execution context
+ * @param baseUrl - The base URL of the SeleniumBase API
+ * @param jobId - The ID of the job
+ * @param initialStatus - The initial status of the job
+ * @param pollingInterval - Interval in seconds between status checks
+ * @param timeout - Maximum time to wait in seconds
+ * @param itemIndex - The item index for error reporting
+ */
+async function waitForJobCompletion(
+    context: IExecuteFunctions,
+    baseUrl: string,
+    jobId: string,
+    initialStatus: string,
+    pollingInterval: number,
+    timeout: number,
+    itemIndex: number,
+): Promise<void> {
+    const startTime = Date.now();
+    const timeoutMs = timeout * MILLISECONDS_PER_SECOND;
+    let status = initialStatus;
+
+    while (status === JOB_STATUS.PENDING || status === JOB_STATUS.RUNNING) {
+        const elapsedTime = Date.now() - startTime;
+
+        if (elapsedTime > timeoutMs) {
+            throw new NodeOperationError(
+                context.getNode(),
+                `Job ${jobId} timed out after ${timeout} seconds`,
+                { itemIndex },
+            );
+        }
+
+        await sleep(pollingInterval * MILLISECONDS_PER_SECOND);
+
+        const statusResponse = await getJobStatus(context, baseUrl, jobId);
+        status = statusResponse.status;
+    }
+
+    // Check if job failed
+    if (status === JOB_STATUS.FAILED) {
+        throw new NodeOperationError(
+            context.getNode(),
+            `Job ${jobId} failed. Check the job result for error details.`,
+            { itemIndex },
+        );
+    }
 }
 
 export class SeleniumBase implements INodeType {
@@ -224,7 +384,7 @@ with SB(headless=True) as sb:
                 displayName: 'Polling Interval (Seconds)',
                 name: 'pollingInterval',
                 type: 'number',
-                default: 5,
+                default: DEFAULT_POLLING_INTERVAL,
                 description: 'How often to check the job status in seconds',
                 displayOptions: {
                     show: {
@@ -237,7 +397,7 @@ with SB(headless=True) as sb:
                 displayName: 'Timeout (Seconds)',
                 name: 'timeout',
                 type: 'number',
-                default: 600,
+                default: DEFAULT_TIMEOUT,
                 description: 'Maximum time to wait for job completion in seconds',
                 displayOptions: {
                     show: {
@@ -287,22 +447,15 @@ with SB(headless=True) as sb:
 
                 if (operation === 'executeScript') {
                     const pythonCode = this.getNodeParameter('pythonCode', itemIndex) as string;
-                    const waitForCompletion = this.getNodeParameter(
-                        'waitForCompletion',
-                        itemIndex,
-                    ) as boolean;
-                    const pollingInterval = this.getNodeParameter(
-                        'pollingInterval',
-                        itemIndex,
-                        5,
-                    ) as number;
-                    const timeout = this.getNodeParameter('timeout', itemIndex, 600) as number;
+                    const waitForCompletion = this.getNodeParameter('waitForCompletion', itemIndex) as boolean;
+
+                    // Validate Python code
+                    validateRequiredString(pythonCode, 'Python Code', this.getNode());
 
                     // Submit the job
                     const submitResponse = await submitJob(this, baseUrl, pythonCode);
 
                     if (!waitForCompletion) {
-                        // Return immediately with job_id
                         returnData.push({
                             json: submitResponse as unknown as IDataObject,
                             pairedItem: itemIndex,
@@ -310,59 +463,52 @@ with SB(headless=True) as sb:
                         continue;
                     }
 
-                    // Poll for completion
-                    const startTime = Date.now();
-                    const timeoutMs = timeout * 1000;
-                    let status = submitResponse.status;
-                    const jobId = submitResponse.job_id;
+                    // Wait for job completion
+                    const pollingInterval = this.getNodeParameter(
+                        'pollingInterval',
+                        itemIndex,
+                        DEFAULT_POLLING_INTERVAL,
+                    ) as number;
+                    const timeout = this.getNodeParameter(
+                        'timeout',
+                        itemIndex,
+                        DEFAULT_TIMEOUT,
+                    ) as number;
 
-                    while (status === 'pending' || status === 'running') {
-                        if (Date.now() - startTime > timeoutMs) {
-                            throw new NodeOperationError(
-                                this.getNode(),
-                                `Job timed out after ${timeout} seconds`,
-                                { itemIndex },
-                            );
-                        }
-
-                        // Wait before polling
-                        await sleep(pollingInterval * 1000);
-
-                        // Check status
-                        const statusResponse = await getJobStatus(this, baseUrl, jobId);
-                        status = statusResponse.status;
-                    }
+                    await waitForJobCompletion(
+                        this,
+                        baseUrl,
+                        submitResponse.job_id,
+                        submitResponse.status,
+                        pollingInterval,
+                        timeout,
+                        itemIndex,
+                    );
 
                     // Get full result
-                    const result = await getJobResult(this, baseUrl, jobId);
-
+                    const result = await getJobResult(this, baseUrl, submitResponse.job_id);
                     const downloadArtifacts = this.getNodeParameter(
                         'downloadArtifacts',
                         itemIndex,
                         true,
                     ) as boolean;
 
-                    // Download artifacts as binary if enabled
-                    const binaryData: { [key: string]: IBinaryData } = {};
-                    if (downloadArtifacts && result.artifacts && result.artifacts.length > 0) {
-                        for (const artifact of result.artifacts) {
-                            const binaryKey = artifact.filename;
-                            binaryData[binaryKey] = await downloadArtifact(
-                                this,
-                                baseUrl,
-                                jobId,
-                                artifact,
-                            );
-                        }
+                    let binaryData: { [key: string]: IBinaryData } | undefined;
+                    if (downloadArtifacts) {
+                        const artifacts = await downloadAllArtifacts(this, baseUrl, submitResponse.job_id, result);
+                        binaryData = Object.keys(artifacts).length > 0 ? artifacts : undefined;
                     }
 
                     returnData.push({
                         json: result as unknown as IDataObject,
-                        binary: Object.keys(binaryData).length > 0 ? binaryData : undefined,
+                        binary: binaryData,
                         pairedItem: itemIndex,
                     });
                 } else if (operation === 'getStatus') {
                     const jobId = this.getNodeParameter('jobId', itemIndex) as string;
+
+                    validateRequiredString(jobId, 'Job ID', this.getNode());
+
                     const statusResponse = await getJobStatus(this, baseUrl, jobId);
 
                     returnData.push({
@@ -371,31 +517,25 @@ with SB(headless=True) as sb:
                     });
                 } else if (operation === 'getResult') {
                     const jobId = this.getNodeParameter('jobId', itemIndex) as string;
-                    const result = await getJobResult(this, baseUrl, jobId);
 
+                    validateRequiredString(jobId, 'Job ID', this.getNode());
+
+                    const result = await getJobResult(this, baseUrl, jobId);
                     const downloadArtifacts = this.getNodeParameter(
                         'downloadArtifacts',
                         itemIndex,
                         true,
                     ) as boolean;
 
-                    // Download artifacts as binary if enabled
-                    const binaryData: { [key: string]: IBinaryData } = {};
-                    if (downloadArtifacts && result.artifacts && result.artifacts.length > 0) {
-                        for (const artifact of result.artifacts) {
-                            const binaryKey = artifact.filename.replace(/[^a-zA-Z0-9_]/g, '_');
-                            binaryData[binaryKey] = await downloadArtifact(
-                                this,
-                                baseUrl,
-                                jobId,
-                                artifact,
-                            );
-                        }
+                    let binaryData: { [key: string]: IBinaryData } | undefined;
+                    if (downloadArtifacts) {
+                        const artifacts = await downloadAllArtifacts(this, baseUrl, jobId, result);
+                        binaryData = Object.keys(artifacts).length > 0 ? artifacts : undefined;
                     }
 
                     returnData.push({
                         json: result as unknown as IDataObject,
-                        binary: Object.keys(binaryData).length > 0 ? binaryData : undefined,
+                        binary: binaryData,
                         pairedItem: itemIndex,
                     });
                 }
@@ -407,7 +547,7 @@ with SB(headless=True) as sb:
                     });
                     continue;
                 }
-                throw new NodeOperationError(this.getNode(), error as Error, { itemIndex });
+                throw error;
             }
         }
 
