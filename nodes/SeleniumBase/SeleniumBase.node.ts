@@ -4,6 +4,7 @@ import type {
     INodeType,
     INodeTypeDescription,
     IDataObject,
+    IBinaryData,
 } from 'n8n-workflow';
 import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
@@ -107,6 +108,29 @@ async function getJobResult(
     });
 
     return response as JobResult;
+}
+
+// Helper function to download an artifact as binary
+async function downloadArtifact(
+    context: IExecuteFunctions,
+    baseUrl: string,
+    jobId: string,
+    artifact: ArtifactInfo,
+): Promise<IBinaryData> {
+    const response = await context.helpers.httpRequest({
+        method: 'GET',
+        url: `${baseUrl}/artifacts/${jobId}/${artifact.filename}`,
+        encoding: 'arraybuffer',
+        returnFullResponse: true,
+    });
+
+    const buffer = Buffer.from(response.body as ArrayBuffer);
+
+    return await context.helpers.prepareBinaryData(
+        buffer,
+        artifact.filename,
+        artifact.type,
+    );
 }
 
 export class SeleniumBase implements INodeType {
@@ -222,6 +246,18 @@ with SB(headless=True) as sb:
                     },
                 },
             },
+            {
+                displayName: 'Download Artifacts',
+                name: 'downloadArtifacts',
+                type: 'boolean',
+                default: true,
+                description: 'Whether to download artifact files as binary data. When enabled, artifacts (screenshots, files) are returned as binary output.',
+                displayOptions: {
+                    show: {
+                        operation: ['executeScript', 'getResult'],
+                    },
+                },
+            },
             // Get Status / Get Result properties
             {
                 displayName: 'Job ID',
@@ -300,8 +336,29 @@ with SB(headless=True) as sb:
                     // Get full result
                     const result = await getJobResult(this, baseUrl, jobId);
 
+                    const downloadArtifacts = this.getNodeParameter(
+                        'downloadArtifacts',
+                        itemIndex,
+                        true,
+                    ) as boolean;
+
+                    // Download artifacts as binary if enabled
+                    const binaryData: { [key: string]: IBinaryData } = {};
+                    if (downloadArtifacts && result.artifacts && result.artifacts.length > 0) {
+                        for (const artifact of result.artifacts) {
+                            const binaryKey = artifact.filename;
+                            binaryData[binaryKey] = await downloadArtifact(
+                                this,
+                                baseUrl,
+                                jobId,
+                                artifact,
+                            );
+                        }
+                    }
+
                     returnData.push({
                         json: result as unknown as IDataObject,
+                        binary: Object.keys(binaryData).length > 0 ? binaryData : undefined,
                         pairedItem: itemIndex,
                     });
                 } else if (operation === 'getStatus') {
@@ -316,8 +373,29 @@ with SB(headless=True) as sb:
                     const jobId = this.getNodeParameter('jobId', itemIndex) as string;
                     const result = await getJobResult(this, baseUrl, jobId);
 
+                    const downloadArtifacts = this.getNodeParameter(
+                        'downloadArtifacts',
+                        itemIndex,
+                        true,
+                    ) as boolean;
+
+                    // Download artifacts as binary if enabled
+                    const binaryData: { [key: string]: IBinaryData } = {};
+                    if (downloadArtifacts && result.artifacts && result.artifacts.length > 0) {
+                        for (const artifact of result.artifacts) {
+                            const binaryKey = artifact.filename.replace(/[^a-zA-Z0-9_]/g, '_');
+                            binaryData[binaryKey] = await downloadArtifact(
+                                this,
+                                baseUrl,
+                                jobId,
+                                artifact,
+                            );
+                        }
+                    }
+
                     returnData.push({
                         json: result as unknown as IDataObject,
+                        binary: Object.keys(binaryData).length > 0 ? binaryData : undefined,
                         pairedItem: itemIndex,
                     });
                 }
