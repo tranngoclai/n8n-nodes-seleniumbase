@@ -165,6 +165,24 @@ export class SeleniumBaseApiClient {
     }
 
     /**
+     * Cleans up a job and its artifacts
+     * @param jobId - The ID of the job to clean up
+     */
+    async cleanupJob(jobId: string): Promise<void> {
+        try {
+            await this.context.helpers.httpRequest({
+                method: 'DELETE',
+                url: `${this.baseUrl}/job/${jobId}`,
+            });
+        } catch (error) {
+            throw new NodeOperationError(
+                this.context.getNode(),
+                `Failed to cleanup job ${jobId}: ${(error as Error).message}`,
+            );
+        }
+    }
+
+    /**
      * Waits for a job to complete by polling its status
      * @param jobId - The ID of the job
      * @param initialStatus - The initial status of the job

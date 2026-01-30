@@ -87,11 +87,20 @@ async function handleExecuteScript(
 		itemIndex,
 		true,
 	) as boolean;
+	const cleanJobAfterExecution = context.getNodeParameter(
+		'cleanJobAfterExecution',
+		itemIndex,
+		true,
+	) as boolean;
 
 	let binaryData: Record<string, IBinaryData> | undefined;
 	if (downloadArtifacts) {
 		const artifacts = await apiClient.downloadAllArtifacts(submitResponse.job_id, result);
 		binaryData = Object.keys(artifacts).length > 0 ? artifacts : undefined;
+	}
+
+	if (cleanJobAfterExecution) {
+		await apiClient.cleanupJob(submitResponse.job_id);
 	}
 
 	return {
@@ -139,11 +148,20 @@ async function handleGetResult(
 		itemIndex,
 		true,
 	) as boolean;
+	const cleanJobAfterExecution = context.getNodeParameter(
+		'cleanJobAfterExecution',
+		itemIndex,
+		true,
+	) as boolean;
 
 	let binaryData: Record<string, IBinaryData> | undefined;
 	if (downloadArtifacts) {
 		const artifacts = await apiClient.downloadAllArtifacts(jobId, result);
 		binaryData = Object.keys(artifacts).length > 0 ? artifacts : undefined;
+	}
+
+	if (cleanJobAfterExecution) {
+		await apiClient.cleanupJob(jobId);
 	}
 
 	return {
@@ -171,7 +189,7 @@ export class SeleniumBase implements INodeType {
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];
 		const credentials = await this.getCredentials('seleniumBaseApi');
-		const baseUrl = (credentials.baseUrl as string).replace(/\/$/, '');
+		const baseUrl = credentials.baseUrl as string;
 
 		const apiClient = new SeleniumBaseApiClient(this, baseUrl);
 

@@ -159,6 +159,19 @@ export const sharedProperties: INodeProperties[] = [
 			},
 		},
 	},
+	{
+		displayName: 'Clean Job After Execution',
+		name: 'cleanJobAfterExecution',
+		type: 'boolean',
+		default: true,
+		description:
+			'Whether to clean up the job and its artifacts on the server after retrieving results. Disable this to keep the job data for later retrieval.',
+		displayOptions: {
+			show: {
+				operation: ['executeScript', 'getResult'],
+			},
+		},
+	},
 ];
 
 /**
