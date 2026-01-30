@@ -40,6 +40,9 @@
             "dist/nodes/SeleniumBase/SeleniumBase.node.js"
         ]
     },
+    "dependencies": {
+        "form-data": "^4.0.1"
+    },
     "devDependencies": {
         "@n8n/node-cli": "*",
         "@types/node": "^25.0.10",
