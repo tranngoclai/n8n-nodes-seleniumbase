@@ -47,6 +47,18 @@ export const operationProperty: INodeProperties = {
 			description: 'Get the full result of a completed job',
 			action: 'Get the full result of a completed job',
 		},
+		{
+			name: 'Clean Up Job',
+			value: 'cleanupJob',
+			description: 'Clean up a job and its artifacts',
+			action: 'Clean up a job',
+		},
+		{
+			name: 'Clean Up Profile',
+			value: 'cleanupProfile',
+			description: 'Clean up a browser profile',
+			action: 'Clean up a browser profile',
+		},
 	],
 	default: 'executeScript',
 };
@@ -113,30 +125,15 @@ export const executeScriptProperties: INodeProperties[] = [
 		},
 	},
 	{
-		displayName: 'Enable Consistent Session',
-		name: 'enableConsistentSession',
+		displayName: 'Maintain Session Consistency',
+		name: 'maintainSessionConsistency',
 		type: 'boolean',
 		default: false,
 		description:
-			'Whether to use a consistent job ID across runs. When enabled, provide a Session Job ID to maintain data consistency between executions.',
+			'Whether to maintain cookies, sessions, and browser state across executions. When enabled, a persistent profile is automatically created using the node name as the profile ID.',
 		displayOptions: {
 			show: {
 				operation: ['executeScript'],
-			},
-		},
-	},
-	{
-		displayName: 'Session Job ID',
-		name: 'sessionJobId',
-		type: 'string',
-		default: '',
-		placeholder: 'e.g., {{ $json.job_id }}',
-		description:
-			'The job ID to use for this session. Leave empty on first run to generate a new ID, then use the returned job_id for subsequent runs. Tip: Use an expression like {{ $json.job_id }} to reference a previous result.',
-		displayOptions: {
-			show: {
-				operation: ['executeScript'],
-				enableConsistentSession: [true],
 			},
 		},
 	},
@@ -180,13 +177,36 @@ export const sharedProperties: INodeProperties[] = [
 export const jobIdProperty: INodeProperties = {
 	displayName: 'Job ID',
 	name: 'jobId',
-	type: 'string',
+	type: 'options',
+	typeOptions: {
+		loadOptionsMethod: 'getJobs',
+	},
 	default: '',
 	required: true,
 	description: 'The ID of the job to check',
 	displayOptions: {
 		show: {
-			operation: ['getStatus', 'getResult'],
+			operation: ['getStatus', 'getResult', 'cleanupJob'],
+		},
+	},
+};
+
+/**
+ * Property for Clean Up Profile operation
+ */
+export const profileNameProperty: INodeProperties = {
+	displayName: 'Profile Name',
+	name: 'profileName',
+	type: 'options',
+	typeOptions: {
+		loadOptionsMethod: 'getProfiles',
+	},
+	default: '',
+	required: true,
+	description: 'The name of the profile to clean up',
+	displayOptions: {
+		show: {
+			operation: ['cleanupProfile'],
 		},
 	},
 };
@@ -199,4 +219,5 @@ export const seleniumBaseProperties: INodeProperties[] = [
 	...executeScriptProperties,
 	...sharedProperties,
 	jobIdProperty,
+	profileNameProperty,
 ];

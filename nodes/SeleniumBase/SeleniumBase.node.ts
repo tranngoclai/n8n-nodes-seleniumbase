@@ -13,6 +13,8 @@ import type {
 	INodeTypeDescription,
 	IDataObject,
 	IBinaryData,
+	ILoadOptionsFunctions,
+	INodePropertyOptions,
 } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
 
@@ -44,20 +46,19 @@ async function handleExecuteScript(
 ): Promise<INodeExecutionData> {
 	const pythonCode = context.getNodeParameter('pythonCode', itemIndex) as string;
 	const waitForCompletion = context.getNodeParameter('waitForCompletion', itemIndex) as boolean;
-	const enableConsistentSession = context.getNodeParameter(
-		'enableConsistentSession',
-		itemIndex,
-		false,
-	) as boolean;
+	const maintainSessionConsistency = context.getNodeParameter('maintainSessionConsistency', itemIndex, false) as boolean;
 
 	validateRequiredString(pythonCode, 'Python Code', context.getNode());
 
-	let sessionJobId: string | undefined;
-	if (enableConsistentSession) {
-		sessionJobId = context.getNodeParameter('sessionJobId', itemIndex, '') as string;
+	let profileName: string | undefined;
+
+	if (maintainSessionConsistency) {
+		// Generate profile ID from node name only
+		const node = context.getNode();
+		profileName = node.name.replace(/[^a-zA-Z0-9_-]/g, '_'); // Sanitize node name
 	}
 
-	const submitResponse = await apiClient.submitJob(pythonCode, sessionJobId);
+	const submitResponse = await apiClient.submitJob(pythonCode, profileName);
 
 	if (!waitForCompletion) {
 		return {
@@ -172,12 +173,87 @@ async function handleGetResult(
 }
 
 /**
+ * Handles the Clean Up Job operation
+ */
+async function handleCleanupJob(
+	context: IExecuteFunctions,
+	apiClient: SeleniumBaseApiClient,
+	itemIndex: number,
+): Promise<INodeExecutionData> {
+	const jobId = context.getNodeParameter('jobId', itemIndex) as string;
+
+	validateRequiredString(jobId, 'Job ID', context.getNode());
+
+	await apiClient.cleanupJob(jobId);
+
+	return {
+		json: { message: `Job ${jobId} cleaned up successfully` } as IDataObject,
+		pairedItem: itemIndex,
+	};
+}
+
+/**
+ * Handles the Clean Up Profile operation
+ */
+async function handleCleanupProfile(
+	context: IExecuteFunctions,
+	apiClient: SeleniumBaseApiClient,
+	itemIndex: number,
+): Promise<INodeExecutionData> {
+	const profileName = context.getNodeParameter('profileName', itemIndex) as string;
+
+	validateRequiredString(profileName, 'Profile Name', context.getNode());
+
+	await apiClient.cleanupProfile(profileName);
+
+	return {
+		json: { message: `Profile ${profileName} cleaned up successfully` } as IDataObject,
+		pairedItem: itemIndex,
+	};
+}
+
+/**
  * SeleniumBase node implementation
  *
  * Implements INodeType interface from n8n-workflow
  */
 export class SeleniumBase implements INodeType {
 	description: INodeTypeDescription = seleniumBaseDescription;
+
+	methods = {
+		loadOptions: {
+			async getJobs(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+				const credentials = await this.getCredentials('seleniumBaseApi');
+				const baseUrl = credentials.baseUrl as string;
+				const apiClient = new SeleniumBaseApiClient(this as unknown as IExecuteFunctions, baseUrl);
+
+				try {
+					const response = await apiClient.listJobs(100, 0);
+					return response.jobs.map((job) => ({
+						name: `${job.job_id} (${job.status})`,
+						value: job.job_id,
+					}));
+				} catch (error) {
+					return [];
+				}
+			},
+			async getProfiles(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+				const credentials = await this.getCredentials('seleniumBaseApi');
+				const baseUrl = credentials.baseUrl as string;
+				const apiClient = new SeleniumBaseApiClient(this as unknown as IExecuteFunctions, baseUrl);
+
+				try {
+					const response = await apiClient.listProfiles(100);
+					return response.profiles.map((profile) => ({
+						name: `${profile.profile_name} (${profile.job_count} jobs)`,
+						value: profile.profile_name,
+					}));
+				} catch (error) {
+					return [];
+				}
+			},
+		},
+	};
 
 	/**
 	 * Executes the node operation
@@ -213,6 +289,16 @@ export class SeleniumBase implements INodeType {
 					}
 					case 'getResult': {
 						const result = await handleGetResult(this, apiClient, itemIndex);
+						returnData.push(result);
+						break;
+					}
+					case 'cleanupJob': {
+						const result = await handleCleanupJob(this, apiClient, itemIndex);
+						returnData.push(result);
+						break;
+					}
+					case 'cleanupProfile': {
+						const result = await handleCleanupProfile(this, apiClient, itemIndex);
 						returnData.push(result);
 						break;
 					}

@@ -59,11 +59,53 @@ export interface ISeleniumBaseStatusResponse {
 }
 
 /**
+ * Job item in the jobs list
+ */
+export interface ISeleniumBaseJobItem {
+    job_id: string;
+    status: string;
+    profile?: string;
+    started_at?: string;
+    completed_at?: string;
+    created_at: string;
+}
+
+/**
+ * Response from listing jobs
+ */
+export interface ISeleniumBaseJobsResponse {
+    jobs: ISeleniumBaseJobItem[];
+}
+
+/**
+ * Profile item in the profiles list
+ */
+export interface ISeleniumBaseProfileItem {
+    profile_name: string;
+    created_at: string;
+    last_used_at?: string;
+    job_count: number;
+}
+
+/**
+ * Response from listing profiles
+ */
+export interface ISeleniumBaseProfilesResponse {
+    profiles: ISeleniumBaseProfileItem[];
+}
+
+/**
  * Node operation types
  */
-export type SeleniumBaseOperation = 'executeScript' | 'getStatus' | 'getResult';
+export type SeleniumBaseOperation =
+    | 'executeScript'
+    | 'getStatus'
+    | 'getResult'
+    | 'cleanupJob'
+    | 'cleanupProfile';
 
 /**
  * Job status values matching JOB_STATUS constants
  */
 export type SeleniumBaseJobStatus = 'pending' | 'running' | 'completed' | 'failed';
+

@@ -14,6 +14,8 @@ import type {
     ISeleniumBaseJobResult,
     ISeleniumBaseStatusResponse,
     ISeleniumBaseSubmitResponse,
+    ISeleniumBaseJobsResponse,
+    ISeleniumBaseProfilesResponse,
 } from './types';
 
 /**
@@ -32,15 +34,15 @@ export class SeleniumBaseApiClient {
     constructor(
         private readonly context: IExecuteFunctions,
         private readonly baseUrl: string,
-    ) {}
+    ) { }
 
     /**
      * Submits a Python script as a job to the SeleniumBase API
      * @param pythonCode - The Python code to execute
-     * @param jobId - Optional custom job ID for consistent sessions
+     * @param profile - Optional browser profile name to use
      * @returns The submit response containing job_id and status
      */
-    async submitJob(pythonCode: string, jobId?: string): Promise<ISeleniumBaseSubmitResponse> {
+    async submitJob(pythonCode: string, profile?: string): Promise<ISeleniumBaseSubmitResponse> {
         const formData = new FormData();
 
         formData.append('file', Buffer.from(pythonCode, 'utf-8'), {
@@ -48,8 +50,8 @@ export class SeleniumBaseApiClient {
             contentType: 'text/x-python',
         });
 
-        if (jobId && jobId.trim() !== '') {
-            formData.append('job_id', jobId.trim());
+        if (profile && profile.trim() !== '') {
+            formData.append('profile', profile.trim());
         }
 
         try {
@@ -178,6 +180,69 @@ export class SeleniumBaseApiClient {
             throw new NodeOperationError(
                 this.context.getNode(),
                 `Failed to cleanup job ${jobId}: ${(error as Error).message}`,
+            );
+        }
+    }
+
+    /**
+     * Lists all jobs with pagination
+     * @param limit - Maximum number of jobs to return
+     * @param offset - Number of jobs to skip
+     * @returns The jobs list response
+     */
+    async listJobs(limit: number, offset: number): Promise<ISeleniumBaseJobsResponse> {
+        try {
+            const response = await this.context.helpers.httpRequest({
+                method: 'GET',
+                url: `${this.baseUrl}/jobs`,
+                qs: { limit, offset },
+            });
+
+            return response as ISeleniumBaseJobsResponse;
+        } catch (error) {
+            throw new NodeOperationError(
+                this.context.getNode(),
+                `Failed to list jobs: ${(error as Error).message}`,
+            );
+        }
+    }
+
+    /**
+     * Lists all browser profiles
+     * @param limit - Maximum number of profiles to return
+     * @returns The profiles list response
+     */
+    async listProfiles(limit: number): Promise<ISeleniumBaseProfilesResponse> {
+        try {
+            const response = await this.context.helpers.httpRequest({
+                method: 'GET',
+                url: `${this.baseUrl}/profiles`,
+                qs: { limit },
+            });
+
+            return response as ISeleniumBaseProfilesResponse;
+        } catch (error) {
+            throw new NodeOperationError(
+                this.context.getNode(),
+                `Failed to list profiles: ${(error as Error).message}`,
+            );
+        }
+    }
+
+    /**
+     * Cleans up a browser profile
+     * @param profileName - The name of the profile to clean up
+     */
+    async cleanupProfile(profileName: string): Promise<void> {
+        try {
+            await this.context.helpers.httpRequest({
+                method: 'DELETE',
+                url: `${this.baseUrl}/profile/${profileName}`,
+            });
+        } catch (error) {
+            throw new NodeOperationError(
+                this.context.getNode(),
+                `Failed to cleanup profile ${profileName}: ${(error as Error).message}`,
             );
         }
     }
