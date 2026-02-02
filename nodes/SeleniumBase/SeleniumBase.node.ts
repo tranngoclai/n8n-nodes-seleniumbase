@@ -16,10 +16,10 @@ import type {
 	ILoadOptionsFunctions,
 	INodePropertyOptions,
 } from 'n8n-workflow';
-import { NodeOperationError } from 'n8n-workflow';
+import { NodeOperationError, NodeConnectionTypes } from 'n8n-workflow';
 
 import { DEFAULT_POLLING_INTERVAL, DEFAULT_TIMEOUT } from './constants';
-import { seleniumBaseDescription } from './description';
+import { seleniumBaseProperties } from './properties';
 import { SeleniumBaseApiClient } from './SeleniumBaseApiClient';
 import type { SeleniumBaseOperation } from './types';
 
@@ -218,7 +218,28 @@ async function handleCleanupProfile(
  * Implements INodeType interface from n8n-workflow
  */
 export class SeleniumBase implements INodeType {
-	description: INodeTypeDescription = seleniumBaseDescription;
+	description: INodeTypeDescription = {
+		displayName: 'SeleniumBase',
+		name: 'seleniumBase',
+		icon: 'file:seleniumbase.svg',
+		group: ['transform'],
+		version: 1,
+		subtitle: '={{$parameter["operation"]}}',
+		description: 'Execute Python scraping scripts using SeleniumBase API',
+		defaults: {
+			name: 'SeleniumBase',
+		},
+		inputs: [NodeConnectionTypes.Main],
+		outputs: [NodeConnectionTypes.Main],
+		usableAsTool: true,
+		credentials: [
+			{
+				name: 'seleniumBaseApi',
+				required: true,
+			},
+		],
+		properties: seleniumBaseProperties,
+	};
 
 	methods = {
 		loadOptions: {
@@ -233,7 +254,7 @@ export class SeleniumBase implements INodeType {
 						name: `${job.job_id} (${job.status})`,
 						value: job.job_id,
 					}));
-				} catch (error) {
+				} catch {
 					return [];
 				}
 			},
@@ -248,7 +269,7 @@ export class SeleniumBase implements INodeType {
 						name: `${profile.profile_name} (${profile.job_count} jobs)`,
 						value: profile.profile_name,
 					}));
-				} catch (error) {
+				} catch {
 					return [];
 				}
 			},

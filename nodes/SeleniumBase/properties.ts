@@ -30,24 +30,6 @@ export const operationProperty: INodeProperties = {
 	noDataExpression: true,
 	options: [
 		{
-			name: 'Execute Script',
-			value: 'executeScript',
-			description: 'Submit and execute a Python scraping script',
-			action: 'Execute a python scraping script',
-		},
-		{
-			name: 'Get Job Status',
-			value: 'getStatus',
-			description: 'Get the status of an existing job',
-			action: 'Get the status of an existing job',
-		},
-		{
-			name: 'Get Job Result',
-			value: 'getResult',
-			description: 'Get the full result of a completed job',
-			action: 'Get the full result of a completed job',
-		},
-		{
 			name: 'Clean Up Job',
 			value: 'cleanupJob',
 			description: 'Clean up a job and its artifacts',
@@ -58,6 +40,24 @@ export const operationProperty: INodeProperties = {
 			value: 'cleanupProfile',
 			description: 'Clean up a browser profile',
 			action: 'Clean up a browser profile',
+		},
+		{
+			name: 'Execute Script',
+			value: 'executeScript',
+			description: 'Submit and execute a Python scraping script',
+			action: 'Execute a python scraping script',
+		},
+		{
+			name: 'Get Job Result',
+			value: 'getResult',
+			description: 'Get the full result of a completed job',
+			action: 'Get the full result of a completed job',
+		},
+		{
+			name: 'Get Job Status',
+			value: 'getStatus',
+			description: 'Get the status of an existing job',
+			action: 'Get the status of an existing job',
 		},
 	],
 	default: 'executeScript',
@@ -175,7 +175,7 @@ export const sharedProperties: INodeProperties[] = [
  * Properties for Get Status and Get Result operations
  */
 export const jobIdProperty: INodeProperties = {
-	displayName: 'Job ID',
+	displayName: 'Job Name or ID',
 	name: 'jobId',
 	type: 'options',
 	typeOptions: {
@@ -183,7 +183,7 @@ export const jobIdProperty: INodeProperties = {
 	},
 	default: '',
 	required: true,
-	description: 'The ID of the job to check',
+	description: 'The ID of the job to check. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 	displayOptions: {
 		show: {
 			operation: ['getStatus', 'getResult', 'cleanupJob'],
@@ -195,7 +195,7 @@ export const jobIdProperty: INodeProperties = {
  * Property for Clean Up Profile operation
  */
 export const profileNameProperty: INodeProperties = {
-	displayName: 'Profile Name',
+	displayName: 'Profile Name or ID',
 	name: 'profileName',
 	type: 'options',
 	typeOptions: {
@@ -203,7 +203,7 @@ export const profileNameProperty: INodeProperties = {
 	},
 	default: '',
 	required: true,
-	description: 'The name of the profile to clean up',
+	description: 'The name of the profile to clean up. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 	displayOptions: {
 		show: {
 			operation: ['cleanupProfile'],
