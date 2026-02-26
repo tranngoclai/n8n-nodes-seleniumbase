@@ -6,6 +6,20 @@ This is an n8n community node that allows you to execute Python scraping scripts
 
 [n8n](https://n8n.io/) is a [fair-code licensed](https://docs.n8n.io/reference/license/) workflow automation platform.
 
+
+## Prerequisite: SeleniumBase API Setup
+
+** Before using this n8n node, set up and run the [SeleniumBase API backend](https://hub.docker.com/r/tranlight/seleniumbase-api) first**
+
+Verify API is ready:
+
+```bash
+curl http://localhost:8000/health
+```
+
+Then set n8n credential **Base URL** to:
+- `http://localhost:8000`
+
 ## Features
 
 - **Execute Python Scripts**: Submit Python code using SeleniumBase for web scraping
