@@ -1,6 +1,6 @@
 {
     "name": "n8n-nodes-seleniumbase",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "n8n community node for executing Python scraping scripts using SeleniumBase API",
     "license": "MIT",
     "homepage": "https://github.com/tranngoclai/seleniumbase",
