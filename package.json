@@ -3,7 +3,7 @@
     "version": "1.0.1",
     "description": "n8n community node for executing Python scraping scripts using SeleniumBase API",
     "license": "MIT",
-    "homepage": "https://github.com/tranngoclai/seleniumbase",
+    "homepage": "https://github.com/tranngoclai/n8n-nodes-seleniumbase",
     "keywords": [
         "n8n-community-node-package",
         "seleniumbase",
@@ -16,7 +16,7 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/tranngoclai/seleniumbase.git"
+        "url": "https://github.com/tranngoclai/n8n-nodes-seleniumbase.git"
     },
     "scripts": {
         "build": "n8n-node build",
